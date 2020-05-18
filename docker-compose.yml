@@ -6,10 +6,8 @@ services:
     container_name: ikev2-vpn-server
     privileged: true
     volumes:
-      - './data/certs/certs:/usr/local/etc/ipsec.d/certs'
-      - './data/certs/private:/usr/local/etc/ipsec.d/private'
-      - './data/certs/cacerts:/usr/local/etc/ipsec.d/cacerts'
       - './data/etc/ipsec.d/ipsec.secrets:/usr/local/etc/ipsec.secrets'
+      - './data/etc/letsencrypt:/etc/letsencrypt'
     env_file:
       - .env
     ports:
