@@ -28,7 +28,7 @@ if [[ ! -f "/usr/local/etc/ipsec.d/certs/fullchain.pem" && ! -f "/usr/local/etc/
     certbot certonly --standalone --preferred-challenges http --agree-tos --no-eff-email --email ${LEEMAIL} -d ${VPNHOST}
     ln -f -s /etc/letsencrypt/live/${VPNHOST}/cert.pem /usr/local/etc/ipsec.d/certs/cert.pem
     ln -f -s /etc/letsencrypt/live/${VPNHOST}/privkey.pem /usr/local/etc/ipsec.d/private/privkey.pem
-    ln -f -s /etc/letsencrypt/live/${VPNHOST}/chain.pem /usr/local/etc/ipsec.d/chain.pem
+    ln -f -s /etc/letsencrypt/live/${VPNHOST}/chain.pem /usr/local/etc/ipsec.d/cacerts/chain.pem
 fi
 
 echo 'rsa-key-size = 4096
@@ -53,11 +53,11 @@ conn ikev2-vpn
     fragmentation=yes
     forceencaps=yes
     dpdaction=clear
-    dpddelay=300s
+    dpddelay=900s
     rekey=no
     left=%any
     leftid=@$LEFT_ID
-    leftcert=fullchain.pem
+    leftcert=cert.pem
     leftsendcert=always
     leftsubnet=0.0.0.0/0
     right=%any
