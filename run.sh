@@ -24,16 +24,19 @@ iptables -t nat -A POSTROUTING -s ${VPNIPPOOL} -o eth0 -j MASQUERADE
 
 iptables -L
 
-if [[ ! -f "/usr/local/etc/ipsec.d/certs/fullchain.pem" && ! -f "/usr/local/etc/ipsec.d/private/privkey.pem" ]] ; then
-    certbot certonly --standalone --preferred-challenges http --agree-tos --no-eff-email --email ${LEEMAIL} -d ${VPNHOST}
-    ln -f -s /etc/letsencrypt/live/${VPNHOST}/cert.pem /usr/local/etc/ipsec.d/certs/cert.pem
-    ln -f -s /etc/letsencrypt/live/${VPNHOST}/privkey.pem /usr/local/etc/ipsec.d/private/privkey.pem
-    ln -f -s /etc/letsencrypt/live/${VPNHOST}/chain.pem /usr/local/etc/ipsec.d/cacerts/chain.pem
-fi
-
-echo 'rsa-key-size = 4096
-renew-hook = ipsec reload && ipsec secrets
-' > /etc/letsencrypt/cli.ini
+mkdir -p ~/pki/{cacerts,certs,private}
+chmod 700 ~/pki
+ipsec pki --gen --type rsa --size 4096 --outform pem > ~/pki/private/ca-key.pem
+ipsec pki --self --ca --lifetime 3650 --in ~/pki/private/ca-key.pem --type rsa --dn "CN=DINO VPN root CA" --outform pem > ~/pki/cacerts/ca-cert.pem
+ipsec pki --gen --type rsa --size 4096 --outform pem > ~/pki/private/server-key.pem
+ipsec pki --pub --in ~/pki/private/server-key.pem --type rsa \
+    | ipsec pki --issue --lifetime 1825 \
+        --cacert ~/pki/cacerts/ca-cert.pem \
+        --cakey ~/pki/private/ca-key.pem \
+        --dn "CN=${VPNHOST}" --san "${VPNHOST}" \
+        --flag serverAuth --flag ikeIntermediate --outform pem \
+    >  ~/pki/certs/server-cert.pem
+cp -r ~/pki/* /etc/ipsec.d/
 
 rm -f /var/run/starter.charon.pid
 
@@ -57,7 +60,7 @@ conn ikev2-vpn
     rekey=no
     left=%any
     leftid=@$LEFT_ID
-    leftcert=cert.pem
+    leftcert=server-cert.pem
     leftsendcert=always
     leftsubnet=0.0.0.0/0
     right=%any
@@ -72,33 +75,10 @@ fi
 
 if [ ! -f "/usr/local/etc/ipsec.secrets" ]; then
 cat > /usr/local/etc/ipsec.secrets <<EOF
-: RSA privkey.pem
+: RSA server-key.pem
 EOF
 fi
 
-if [[ ! -z "$RADIUS_SERVER" && ! -z "$RADIUS_SERVER_SECRET" ]]; then
-rm /usr/local/etc/strongswan.d/charon/eap-radius.conf
-cat >> /usr/local/etc/strongswan.d/charon/eap-radius.conf <<EOF
-eap-radius {
-    accounting = yes
-    accounting_close_on_timeout = no
-    accounting_interval = 500
-    close_all_on_timeout = no
-    load = yes
-    nas_identifier = $VPNHOST
-
-    # Section to specify multiple RADIUS servers.
-    servers {
-        primary {
-            address = $RADIUS_SERVER
-            secret = $RADIUS_SERVER_SECRET
-            auth_port = 1812   # default
-            acct_port = 1813   # default
-        }
-    }
-}
-EOF
-fi
 sysctl -p
 
 ipsec start --nofork

@@ -13,24 +13,6 @@ services:
     ports:
       - '500:500/udp'
       - '4500:4500/udp'
-      - '80:80'
-    depends_on:
-      - radius
-    links:
-      - radius
-    networks:
-      - backend
-
-  radius:
-    image: 'freeradius/freeradius-server:latest'
-    container_name: freeradius-server
-    volumes:
-      - './freeradius/clients.conf:/etc/raddb/clients.conf'
-      - './freeradius/mods-enabled/rest:/etc/raddb/mods-enabled/rest'
-      - './freeradius/sites-enabled/default:/etc/raddb/sites-enabled/default'
-    env_file:
-      - .env
-    command: radiusd -X
     networks:
       - backend
 networks:
